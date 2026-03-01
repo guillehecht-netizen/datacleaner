@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>DataCleaner Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c27;
+    --border: #2a2a3d;
+    --accent: #6ee7b7;
+    --accent2: #818cf8;
+    --accent3: #f472b6;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --danger: #f87171;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 30px 20px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(110,231,183,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .wrapper { max-width: 1050px; margin: auto; }
+
+  header {
+    display: flex; align-items: baseline; gap: 16px;
+    margin-bottom: 40px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 28px; font-weight: 800; letter-spacing: -1px; color: var(--accent); }
+  header span { color: var(--muted); font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent2);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::before { content: ''; display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); }
+
+  textarea {
+    width: 100%; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; padding: 14px; resize: vertical;
+    outline: none; transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  #input { height: 160px; }
+  #output { height: 200px; color: var(--accent); background: #060608; white-space: pre; }
+
+  /* Field detection row */
+  .detect-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin: 20px 0;
+  }
+
+  .fields-row {
+    display: flex; flex-wrap: wrap; gap: 10px; min-height: 52px;
+    align-items: center;
+  }
+
+  .field-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px;
+    cursor: grab; user-select: none;
+    transition: all 0.15s; font-size: 13px;
+  }
+  .field-chip:active { cursor: grabbing; }
+  .field-chip.dragging { opacity: 0.3; }
+  .field-chip:hover { border-color: var(--accent2); }
+
+  .chip-badge {
+    font-size: 9px; font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase; letter-spacing: 1px;
+    padding: 2px 6px; border-radius: 4px; font-weight: 700;
+  }
+  .badge-email  { background: rgba(248,114,171,0.2); color: var(--accent3); }
+  .badge-phone  { background: rgba(110,231,183,0.2); color: var(--accent); }
+  .badge-name   { background: rgba(129,140,248,0.2); color: var(--accent2); }
+  .badge-id     { background: rgba(251,191,36,0.2);  color: #fbbf24; }
+  .badge-data   { background: rgba(100,116,139,0.2); color: var(--muted); }
+
+  .chip-value { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Options bar */
+  .options-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 22px;
+    margin-bottom: 20px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 20px;
+  }
+  .opt-label { font-size: 11px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  
+  .seg-control { display: flex; gap: 2px; background: var(--surface2); border-radius: 8px; padding: 3px; }
+  .seg-btn {
+    padding: 6px 14px; border: none; border-radius: 6px; background: transparent;
+    color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .seg-btn.active { background: var(--accent2); color: white; }
+
+  .toggle-group { display: flex; gap: 12px; flex-wrap: wrap; }
+  .toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13px; }
+  .toggle input { display: none; }
+  .toggle-box {
+    width: 14px; height: 14px; border: 1.5px solid var(--border);
+    border-radius: 3px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .toggle input:checked + .toggle-box { border-color: var(--accent); background: var(--accent); }
+  .toggle input:checked + .toggle-box::after { content: '✓'; font-size: 9px; color: #000; font-weight: 900; }
+
+  /* Action buttons */
+  .actions { display: flex; gap: 12px; margin-bottom: 16px; }
+  .btn {
+    flex: 1; padding: 16px; border: none; border-radius: 10px;
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #a7f3d0; transform: translateY(-1px); }
+  .btn-copy { background: var(--surface2); color: var(--accent2); border: 1px solid var(--accent2); display: none; }
+  .btn-copy:hover { background: rgba(129,140,248,0.1); }
+  .btn-json { background: var(--surface2); color: var(--accent3); border: 1px solid var(--accent3); display: none; }
+  .btn-json:hover { background: rgba(244,114,182,0.1); }
+
+  /* Stats strip */
+  .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 14px; }
+  .stat { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  .stat strong { color: var(--accent); }
+
+  /* Warning */
+  .warn { background: rgba(248,114,114,0.1); border: 1px solid rgba(248,114,114,0.3); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--danger); margin-top: 10px; display: none; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <header>
+    <h1>DataCleaner Pro</h1>
+    <span>v2.0 · CRM → Script</span>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-title">01 · Datos de entrada</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:6px;"><button onclick="borrarEntrada()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕ BORRAR</button></div>
+      <textarea id="input" placeholder="Pegá aquí los datos del CRM...&#10;&#10;Ejemplo:&#10;Juan Pérez 1155443322 juan@mail.com&#10;María García 1166778899 maria@mail.com"></textarea>
+      <div class="stats" id="statsIn"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">02 · Vista previa del resultado</div>
+      <textarea id="output" readonly placeholder="El resultado aparecerá aquí..."></textarea>
+      <div class="stats" id="statsOut"></div>
+      <div class="warn" id="warnBox"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:20px;">
+    <div class="panel-title">🔑 API Key de Gemini</div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <input type="password" id="apiKey" placeholder="Pegá tu API Key de Google AI Studio..." 
+        style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+        color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:12px;outline:none;"
+        oninput="localStorage.setItem('gemini_key', this.value)">
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" 
+        style="color:var(--accent2);font-size:11px;font-family:'JetBrains Mono',monospace;white-space:nowrap;text-decoration:none;">
+        Obtener Key →</a>
+    </div>
+  </div>
+
+  <div class="detect-bar">
+    <div class="panel-title">03 · Campos detectados — arrastrá para reordenar</div>
+    <div class="fields-row" id="fieldsRow">
+      <span style="color: var(--muted); font-size: 12px; font-family: 'JetBrains Mono', monospace;">Pegá datos arriba para detectar campos...</span>
+    </div>
+  </div>
+
+  <div class="options-bar">
+
+    <div>
+      <div class="opt-label" style="margin-bottom:8px">Limpieza</div>
+      <div class="toggle-group">
+        <label class="toggle"><input type="checkbox" id="optPhone" checked><div class="toggle-box"></div>Teléfonos</label>
+        <label class="toggle"><input type="checkbox" id="optEmail" checked><div class="toggle-box"></div>Emails</label>
+        <label class="toggle"><input type="checkbox" id="optTrim" checked><div class="toggle-box"></div>Espacios extra</label>
+        <label class="toggle"><input type="checkbox" id="optUpper"><div class="toggle-box"></div>MAYÚSCULAS</label>
+        <label class="toggle"><input type="checkbox" id="optHeader"><div class="toggle-box"></div>Incluir encabezado</label>
+      </div>
+    </div>
+    <div>
+      <div class="opt-label" style="margin-bottom:8px">Modo nombre</div>
+      <div class="seg-control" id="nameCtrl">
+        <button class="seg-btn active" onclick="setNameMode(this,'junto')">JUNTO<br><span style="font-size:9px;opacity:0.6">Juan Pérez</span></button>
+        <button class="seg-btn" onclick="setNameMode(this,'separado')">SEPARADO<br><span style="font-size:9px;opacity:0.6">Nombre|Apellido</span></button>
+        <button class="seg-btn" onclick="setNameMode(this,'excel')">EXCEL<br><span style="font-size:9px;opacity:0.6">tab&#8594;tab</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="procesar()">↳ PROCESAR</button>
+    <button class="btn btn-copy" id="btnCopy" onclick="copiar()">COPIAR</button>
+    <button class="btn btn-cp" id="btnCp" onclick="generarCP()" style="background:#1c1c27;color:#fbbf24;border:1px solid #fbbf24;display:none;">GENERAR CP</button>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let separador = '   '; // siempre 3 espacios
+let nameMode = 'junto'; // 'junto' | 'separado'
+let detectedFields = []; // [{value, type, label, index}] from first line
+
+// ─── FIELD DETECTION ─────────────────────────────────────────────────────────
+function detectType(token) {
+  if (token.includes('@') && token.includes('.')) return { type:'email', label:'Email' };
+  const digits = (token.match(/\d/g) || []).length;
+  if (digits >= 10) return { type:'phone', label:'Teléfono' };
+  if (digits >= 7 && digits <= 9) return { type:'id', label:'DNI/ID' };
+  if (/^[A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]+(\s[A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñ]+)*$/.test(token)) return { type:'name', label:'Nombre' };
+  return { type:'data', label:'Dato' };
+}
+
+function setNameMode(btn, mode) {
+  document.querySelectorAll('#nameCtrl .seg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  nameMode = mode;
+  const raw = document.getElementById('input').value.trim();
+  if (raw) {
+    const lines = raw.split('\n').filter(l => l.trim().length > 2);
+    const first = smartSplit(lines[0]);
+    detectedFields = buildFields(first);
+    renderChips(detectedFields);
+    reprocesarSiHayResultado();
+  }
+}
+
+function smartSplit(line) {
+  // EXCEL mode: always split by tab
+  if (nameMode === 'excel') {
+    return line.split('\t').map(s => s.trim()).filter(Boolean);
+  }
+  // SEPARADO mode: exactly 3 spaces = field separator
+  if (nameMode === 'separado') {
+    const parts = line.split('   ').map(s => s.trim()).filter(Boolean);
+    if (parts.length > 1) return parts;
+  }
+  // JUNTO / fallback: detect separator then smart-group
+  if (line.includes('\t')) return line.split('\t').map(s => s.trim());
+  if (line.includes(',')) return line.split(',').map(s => s.trim());
+  if (line.includes(';')) return line.split(';').map(s => s.trim());
+  if (line.includes('|')) return line.split('|').map(s => s.trim());
+  return groupSpaceTokens(line);
+}
+
+function groupSpaceTokens(line) {
+  // Smart grouping: consecutive "name" words get merged, numbers/emails stay separate
+  const raw = line.trim().split(/\s+/);
+  const result = [];
+  let nameBuffer = [];
+
+  function flushName() {
+    if (nameBuffer.length) { result.push(nameBuffer.join(' ')); nameBuffer = []; }
+  }
+
+  raw.forEach(token => {
+    const t = detectType(token).type;
+    if (t === 'phone' || t === 'email' || t === 'id') {
+      flushName();
+      result.push(token);
+    } else if (t === 'name') {
+      nameBuffer.push(token);
+    } else {
+      // unknown: if buffer active keep going, else push solo
+      if (nameBuffer.length) nameBuffer.push(token);
+      else result.push(token);
+    }
+  });
+  flushName();
+  return result;
+}
+
+function buildFields(tokens) {
+  return tokens.map((val, i) => {
+    const { type, label } = detectType(val.trim());
+    return { value: val.trim(), type, label, originalIndex: i };
+  });
+}
+
+// ─── UI: CHIPS ───────────────────────────────────────────────────────────────
+function badgeClass(type) {
+  return { email:'badge-email', phone:'badge-phone', name:'badge-name', id:'badge-id', data:'badge-data' }[type] || 'badge-data';
+}
+
+function renderChips(fields) {
+  const row = document.getElementById('fieldsRow');
+  row.innerHTML = '';
+  fields.forEach((f, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'field-chip';
+    chip.draggable = true;
+    chip.dataset.idx = i;
+    chip.innerHTML = `<span class="chip-badge ${badgeClass(f.type)}">${f.label}</span><span class="chip-value">${f.value}</span>`;
+    chip.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', i); chip.classList.add('dragging'); });
+    chip.addEventListener('dragend', () => chip.classList.remove('dragging'));
+    row.appendChild(chip);
+  });
+
+  row.addEventListener('dragover', e => {
+    e.preventDefault();
+    const dragging = document.querySelector('.field-chip.dragging');
+    if (!dragging) return;
+    const after = getDragAfter(row, e.clientX);
+    if (!after) row.appendChild(dragging);
+    else row.insertBefore(dragging, after);
+  });
+}
+
+function getDragAfter(container, x) {
+  const chips = [...container.querySelectorAll('.field-chip:not(.dragging)')];
+  return chips.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = x - box.left - box.width / 2;
+    if (offset < 0 && offset > closest.offset) return { offset, element: child };
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// ─── INPUT LISTENER ──────────────────────────────────────────────────────────
+document.getElementById('input').addEventListener('paste', (e) => {
+  e.preventDefault();
+  // Get plain text preserving tabs exactly as-is
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+  const ta = document.getElementById('input');
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+  ta.selectionStart = ta.selectionEnd = start + text.length;
+  // Auto-detect mode: if tabs present, switch to EXCEL automatically
+  if (text.includes('\t')) {
+    const excelBtn = document.querySelector('#nameCtrl .seg-btn:last-child');
+    setNameMode(excelBtn, 'excel');
+  }
+  ta.dispatchEvent(new Event('input'));
+});
+
+document.getElementById('input').addEventListener('input', () => {
+  const raw = document.getElementById('input').value.trim();
+  if (!raw) return;
+  const lines = raw.split('\n').filter(l => l.trim().length > 2);
+  const first = smartSplit(lines[0]);
+  detectedFields = buildFields(first);
+  renderChips(detectedFields);
+
+  const statsIn = document.getElementById('statsIn');
+  statsIn.innerHTML = `<span class="stat">Líneas: <strong>${lines.length}</strong></span> <span class="stat">Campos detectados: <strong>${detectedFields.length}</strong></span>`;
+});
+
+// ─── CLEAN FUNCTIONS ─────────────────────────────────────────────────────────
+function cleanPhone(s) {
+  if (!document.getElementById('optPhone').checked) return s;
+  const digits = (s.match(/\d/g) || []).length;
+  if (digits < 7) return s;
+  // Strip everything except digits
+  let clean = s.replace(/[^\d]/g, '');
+  // Always keep last 10 digits (removes country codes: 52, 54, 1, etc.)
+  if (clean.length > 10) clean = clean.slice(-10);
+  return clean;
+}
+
+function cleanEmail(s) {
+  if (!document.getElementById('optEmail').checked) return s;
+  return s.toLowerCase().trim();
+}
+
+function cleanToken(s, type) {
+  let v = document.getElementById('optTrim').checked ? s.trim() : s;
+  if (type === 'phone') v = cleanPhone(v);
+  if (type === 'email') v = cleanEmail(v);
+  if (document.getElementById('optUpper').checked && type === 'name') v = v.toUpperCase();
+  return v;
+}
+
+// ─── PROCESS ─────────────────────────────────────────────────────────────────
+function procesar() {
+  const raw = document.getElementById('input').value.trim();
+  if (!raw) return;
+  const lines = raw.split('\n').filter(l => l.trim().length > 2);
+
+  // Get current chip order from DOM
+  const chips = [...document.querySelectorAll('.field-chip')];
+  const orderIdx = chips.map(c => parseInt(c.dataset.idx));
+  const orderedFields = orderIdx.map(i => detectedFields[i]);
+
+  const sep = separador;
+  let rows = [];
+  let warnings = 0;
+
+  // Optional header
+  if (document.getElementById('optHeader').checked) {
+    let headers = [];
+    orderedFields.forEach(f => {
+      if (nameMode === 'separado' && f.type === 'name') {
+        headers.push('Nombre'); headers.push('Apellido');
+      } else {
+        headers.push(f.label);
+      }
+    });
+    rows.push(headers.join(sep));
+  }
+
+  lines.forEach((line, li) => {
+    const tokens = smartSplit(line);
+    if (tokens.length !== detectedFields.length) warnings++;
+    let row = [];
+    orderedFields.forEach((f) => {
+      const val = tokens[f.originalIndex] || '';
+      // If SEPARADO mode and field is a name, split into nombre + apellido
+      const isNameField = f.type === 'name' || (nameMode === 'separado' && f.type === 'data' && !val.includes('@') && (val.match(/\d/g)||[]).length < 7);
+      if (nameMode === 'separado' && isNameField) {
+        const partes = val.trim().split(/\s+/);
+        const mitad = Math.ceil(partes.length / 2);
+        const nombre = partes.slice(0, mitad).join(' ');
+        const apellido = partes.slice(mitad).join(' ');
+        const nombreLimpio = cleanToken(nombre, 'name');
+        const apellidoLimpio = apellido ? cleanToken(apellido, 'name') : '';
+        // Join with 3 spaces regardless of output separator
+        row.push(apellidoLimpio ? nombreLimpio + '   ' + apellidoLimpio : nombreLimpio);
+      } else {
+        row.push(cleanToken(val, f.type));
+      }
+    });
+    rows.push(row.join(sep));
+  });
+
+  const result = rows.join('\n');
+  document.getElementById('output').value = result;
+
+  const statsOut = document.getElementById('statsOut');
+  statsOut.innerHTML = `<span class="stat">Filas: <strong>${lines.length}</strong></span> <span class="stat">Campos: <strong>${orderedFields.length}</strong></span>`;
+
+  const warn = document.getElementById('warnBox');
+  if (warnings > 0) {
+    warn.style.display = 'block';
+    warn.textContent = `⚠ ${warnings} fila(s) con cantidad de campos diferente — revisá la entrada.`;
+  } else { warn.style.display = 'none'; }
+
+  document.getElementById('btnCopy').style.display = 'block';
+  document.getElementById('btnCp').style.display = 'block';
+}
+
+// ─── EXPORT ──────────────────────────────────────────────────────────────────
+function copiar() {
+  const v = document.getElementById('output').value;
+  navigator.clipboard.writeText(v).then(() => {
+    const btn = document.getElementById('btnCopy');
+    btn.textContent = '✓ COPIADO';
+    setTimeout(() => btn.textContent = 'COPIAR', 1500);
+  });
+}
+
+
+function generarCP() {
+  const resultado = document.getElementById('output').value.trim();
+  if (!resultado) { alert('Primero procesá los datos'); return; }
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { alert('Ingresá tu API Key de Gemini'); return; }
+
+  const btn = document.getElementById('btnCp');
+  btn.textContent = '⏳ PROCESANDO...';
+  btn.style.opacity = '0.6';
+  btn.disabled = true;
+
+  const promptTexto = `Eres un experto en códigos postales de todos los países. Te enviaré una lista de contactos y debés reemplazar la ubicación por un código postal real y DIFERENTE en cada línea.
+
+REGLAS ESTRICTAS:
+1. VARIACIÓN OBLIGATORIA: Nunca repitas el mismo CP dos veces en toda la lista. Cada línea debe tener un CP distinto aunque sean de la misma ciudad o estado. Usá diferentes colonias, municipios, barrios o zonas de esa región.
+2. CP REALES: Usá códigos postales que existan realmente en esa zona geográfica.
+3. FORMATO CORRECTO: Respetá el formato del país (5 dígitos para México/EEUU, alfanumérico para UK, etc.).
+4. SIN REPETIR: Revisá toda la lista antes de responder y asegurate de que ningún CP aparezca dos veces.
+5. MISMO FORMATO: Mantené exactamente el mismo espaciado y estructura de cada línea. Solo reemplazá la ubicación por el CP. Sin etiquetas, sin explicaciones, sin negritas.
+
+Lista de contactos:
+
+${resultado}`;
+
+  const modelos = ['gemini-2.0-flash-lite','gemini-2.0-flash-lite-001','gemini-2.0-flash-001','gemini-2.5-flash','gemini-2.5-pro'];
+  
+  async function intentarModelos(lista) {
+    for (const modelo of lista) {
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptTexto }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+          })
+        });
+        if (r.status === 429) throw new Error('⏳ Límite de cuota alcanzado. Esperá 1 minuto y volvé a intentar. Si el problema persiste, habilitá billing en Google Cloud.');
+        if (r.status === 403) throw new Error('🔑 API Key inválida o sin permisos. Verificá tu key en aistudio.google.com');
+        if (r.status === 404) { continue; } // modelo no disponible, probar el siguiente
+        if (!r.ok) {
+          const e = await r.json();
+          throw new Error(`HTTP ${r.status}: ${e?.error?.message || r.statusText}`);
+        }
+        const data = await r.json();
+        if (data.error) throw new Error('Error de API: ' + data.error.message);
+        const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (!texto) throw new Error(`Sin respuesta. Razón: ${data.candidates?.[0]?.finishReason || 'desconocido'}`);
+        document.getElementById('output').value = texto.trim();
+        btn.textContent = '✓ CP GENERADOS';
+        setTimeout(() => { btn.textContent = 'GENERAR CP'; btn.style.opacity = '1'; btn.disabled = false; }, 2000);
+        return;
+      } catch(err) {
+        if (!err.message.includes('404')) {
+          alert('Error: ' + err.message);
+          btn.textContent = 'GENERAR CP'; btn.style.opacity = '1'; btn.disabled = false;
+          return;
+        }
+      }
+    }
+    alert('❌ Ningún modelo disponible para tu API key. Verificá que la key sea válida.');
+    btn.textContent = 'GENERAR CP'; btn.style.opacity = '1'; btn.disabled = false;
+  }
+  intentarModelos(modelos);
+}
+
+function reprocesarSiHayResultado() {
+  if (document.getElementById('output').value.trim()) procesar();
+}
+
+
+
+// Load saved API key + reset button state
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('gemini_key');
+  if (saved) document.getElementById('apiKey').value = saved;
+  document.getElementById('input').focus();
+  // Reset button in case page was reloaded mid-process
+  const btn = document.getElementById('btnCp');
+  btn.textContent = 'GENERAR CP';
+  btn.style.opacity = '1';
+  btn.disabled = false;
+});
+
+function borrarEntrada() {
+  document.getElementById('input').value = '';
+  document.getElementById('output').value = '';
+  document.getElementById('statsIn').innerHTML = '';
+  document.getElementById('statsOut').innerHTML = '';
+  document.getElementById('fieldsRow').innerHTML = `<span style="color: var(--muted); font-size: 12px; font-family: 'JetBrains Mono', monospace;">Pegá datos arriba para detectar campos...</span>`;
+  document.getElementById('warnBox').style.display = 'none';
+  document.getElementById('btnCopy').style.display = 'none';
+  document.getElementById('btnCp').style.display = 'none';
+  detectedFields = [];
+}
+
+// Auto-reprocess on any toggle change
+document.querySelectorAll('.toggle input[type=checkbox]').forEach(cb => {
+  cb.addEventListener('change', reprocesarSiHayResultado);
+});
+</script>
+</body>
+</html>
