@@ -180,7 +180,8 @@
   <div class="grid">
     <div class="panel">
       <div class="panel-title">01 · Datos de entrada</div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:6px;"><button onclick="borrarEntrada()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕ BORRAR</button></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:6px;"><button onclick="pegarPortapapeles()" style="background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='rgba(110,231,183,0.1)'" onmouseout="this.style.background='transparent'">📋 PEGAR</button>
+      <button onclick="borrarEntrada()" style="background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕ BORRAR</button></div>
       <textarea id="input" placeholder="Pegá aquí los datos del CRM...&#10;&#10;Ejemplo:&#10;Juan Pérez 1155443322 juan@mail.com&#10;María García 1166778899 maria@mail.com"></textarea>
       <div class="stats" id="statsIn"></div>
     </div>
@@ -579,6 +580,17 @@ window.addEventListener('DOMContentLoaded', () => {
   btn.style.opacity = '1';
   btn.disabled = false;
 });
+
+function pegarPortapapeles() {
+  navigator.clipboard.readText().then(text => {
+    if (!text.trim()) { alert('El portapapeles está vacío. Copiá los datos del Excel primero.'); return; }
+    const ta = document.getElementById('input');
+    ta.value = text;
+    ta.dispatchEvent(new Event('input'));
+  }).catch(() => {
+    alert('No se pudo leer el portapapeles. Usá Ctrl+V directamente en el campo de texto.');
+  });
+}
 
 function borrarEntrada() {
   document.getElementById('input').value = '';
