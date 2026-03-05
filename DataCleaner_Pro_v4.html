@@ -342,7 +342,27 @@ async function parsearConGemini(rawText, template) {
   const apiKey = document.getElementById('apiKey').value.trim();
   if (!apiKey) { alert('Ingresá tu API Key de Gemini'); return null; }
 
-  const lines = rawText.trim().split('\n').filter(l => l.trim().length > 2);
+  // Preprocesar: unir líneas que son continuación (ciudad suelta en línea siguiente)
+  let rawLines = rawText.trim().split('\n');
+  let cleanedLines = [];
+  
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i].trim();
+    if (!line) continue;
+    
+    // Si la línea tiene email o teléfono, es un lead completo o inicio de lead
+    const tieneEmail = line.includes('@');
+    const tieneTelefono = /\+?\d{10,}/.test(line.replace(/\D/g, '').slice(-10));
+    
+    if (tieneEmail || tieneTelefono) {
+      cleanedLines.push(line);
+    } else if (cleanedLines.length > 0) {
+      // Es una línea suelta (probablemente ciudad), unir con la anterior
+      cleanedLines[cleanedLines.length - 1] += ' ' + line;
+    }
+  }
+  
+  const lines = cleanedLines.filter(l => l.trim().length > 2);
   
   const camposRequeridos = [...new Set(template)];
   const camposStr = camposRequeridos.join(', ');
@@ -356,10 +376,10 @@ REGLAS IMPORTANTES:
 - "telefono" = solo los últimos 10 dígitos, sin código de país
 - "email" = el email completo. A veces viene pegado al apellido (ej: "Villamilluisj@mail.com" significa apellido2=Villamil, email=luisj@mail.com)
 - "dni" = número de documento, puede venir con puntos
-- "ciudad" = ciudad, departamento o estado
+- "ciudad" = ciudad, departamento o estado. Puede venir al final o separada.
 - "cp" = código postal (si viene un número de 4-6 dígitos que parece CP)
 
-Respondé SOLO con JSON válido, sin markdown ni explicaciones:
+IMPORTANTE: Respondé ÚNICAMENTE con JSON válido. Sin texto antes ni después. Sin markdown. Sin comillas extras dentro de los valores.
 {"filas":[{"nombre":"...","apellido1":"...","apellido2":"...","email":"...","telefono":"...","ciudad":"...","cp":"...","dni":"..."}]}
 
 Si un campo no existe, poné "".
@@ -376,7 +396,7 @@ ${lines.join('\n')}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: promptText }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+          generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
         })
       });
       
@@ -394,8 +414,22 @@ ${lines.join('\n')}`;
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       if (!text) throw new Error(`Sin respuesta. Razón: ${data.candidates?.[0]?.finishReason || 'desconocido'}`);
       
-      const clean = text.replace(/```json|```/g, '').trim();
-      return JSON.parse(clean);
+      // Limpiar y extraer JSON
+      let clean = text.replace(/```json|```/g, '').trim();
+      
+      // Intentar extraer solo el JSON si hay texto extra
+      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+      if (jsonMatch) clean = jsonMatch[0];
+      
+      // Arreglar problemas comunes de JSON
+      clean = clean.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+      
+      try {
+        return JSON.parse(clean);
+      } catch (jsonErr) {
+        console.warn('JSON mal formado, reintentando...', jsonErr);
+        continue; // Probar con otro modelo
+      }
       
     } catch (e) {
       if (!e.message.includes('404')) {
@@ -406,7 +440,7 @@ ${lines.join('\n')}`;
     }
   }
   
-  alert('❌ Ningún modelo disponible. Verificá tu API key.');
+  alert('❌ No se pudo procesar. Intentá de nuevo.');
   return null;
 }
 
@@ -517,198 +551,3 @@ async function procesar() {
         // El separador = 3 espacios (corte de casillero)
         output += '   ';
         isFirst = true; // El próximo campo no necesita espacio antes
-      } else {
-        // Campo normal
-        const val = cleanVal(fila[field] || '', field);
-        if (!isFirst) {
-          output += ' '; // 1 espacio entre campos del mismo grupo
-        }
-        output += val;
-        isFirst = false;
-      }
-    });
-    
-    return output;
-  });
-  
-  let resultado = rows.join('\n');
-  
-  // Si está tildado "Generar CP", convertir ciudades a códigos postales
-  if (document.getElementById('optCP').checked) {
-    btn.textContent = 'Generando CP variados...';
-    resultado = await generarCP(resultado);
-  }
-  
-  document.getElementById('output').value = resultado;
-  document.getElementById('statsOut').innerHTML =
-    '<span class="stat">Filas: <strong>' + result.filas.length + '</strong></span>' +
-    ' <span class="stat">Columnas: <strong>' + template.length + '</strong></span>';
-  
-  document.getElementById('btnCopy').style.display = 'block';
-  
-  btn.textContent = '✓ Listo';
-  setTimeout(() => {
-    btn.textContent = '⚡ PROCESAR';
-    btn.disabled = false;
-  }, 1500);
-}
-
-function copiar() {
-  navigator.clipboard.writeText(document.getElementById('output').value).then(() => {
-    const btn = document.getElementById('btnCopy');
-    btn.textContent = '✓ COPIADO';
-    setTimeout(() => btn.textContent = 'COPIAR TODO', 1500);
-  });
-}
-
-function pegarPortapapeles() {
-  navigator.clipboard.readText().then(text => {
-    if (!text.trim()) { alert('El portapapeles está vacío.'); return; }
-    const ta = document.getElementById('input');
-    ta.value = text;
-    ta.dispatchEvent(new Event('input'));
-  }).catch(() => {
-    alert('No se pudo leer el portapapeles. Usá Ctrl+V directamente.');
-  });
-}
-
-function borrarEntrada() {
-  document.getElementById('input').value = '';
-  document.getElementById('output').value = '';
-  document.getElementById('statsIn').innerHTML = '';
-  document.getElementById('statsOut').innerHTML = '';
-  document.getElementById('btnCopy').style.display = 'none';
-}
-
-// === CAMPAÑAS ===
-function loadCampaigns() {
-  const saved = localStorage.getItem(CAMPAIGNS_KEY);
-  campaigns = saved ? JSON.parse(saved) : {};
-  if (!Object.keys(campaigns).length) {
-    campaigns['default'] = { name: 'General', template: [], opts: {} };
-  }
-  renderCampaignSelect();
-}
-
-function saveCampaigns() {
-  localStorage.setItem(CAMPAIGNS_KEY, JSON.stringify(campaigns));
-}
-
-function renderCampaignSelect() {
-  const sel = document.getElementById('campaignSelect');
-  const cur = activeCampaign || Object.keys(campaigns)[0];
-  sel.innerHTML = '';
-  Object.keys(campaigns).forEach(id => {
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = campaigns[id].name;
-    if (id === cur) opt.selected = true;
-    sel.appendChild(opt);
-  });
-  activeCampaign = sel.value;
-  cargarCampana(activeCampaign);
-}
-
-function cargarCampana(id) {
-  const c = campaigns[id];
-  if (!c) return;
-  activeCampaign = id;
-  setTemplate(c.template || []);
-  if (c.opts) {
-    ['optPhone', 'optEmail', 'optUpper', 'optTrim', 'optDni', 'optCP'].forEach(k => {
-      if (c.opts[k] !== undefined) document.getElementById(k).checked = c.opts[k];
-    });
-    if (c.opts.sep !== undefined) {
-      if (c.opts.sep === ' ') setSep(1);
-      else if (c.opts.sep === '\t') setSep('tab');
-      else setSep(3);
-    }
-  }
-  setStatus('cargado');
-}
-
-function guardarCampana() {
-  if (!activeCampaign) return;
-  campaigns[activeCampaign].template = getTemplate();
-  campaigns[activeCampaign].opts = {
-    optPhone: document.getElementById('optPhone').checked,
-    optEmail: document.getElementById('optEmail').checked,
-    optUpper: document.getElementById('optUpper').checked,
-    optTrim: document.getElementById('optTrim').checked,
-    optDni: document.getElementById('optDni').checked,
-    optCP: document.getElementById('optCP').checked,
-    sep: currentSep,
-  };
-  saveCampaigns();
-  setStatus('guardado ✓');
-}
-
-function nuevaCampanaModal() {
-  document.getElementById('modalNombre').value = '';
-  document.getElementById('modalOverlay').classList.add('show');
-  setTimeout(() => document.getElementById('modalNombre').focus(), 100);
-}
-
-function cerrarModal() {
-  document.getElementById('modalOverlay').classList.remove('show');
-}
-
-function confirmarNuevaCampana() {
-  const nombre = document.getElementById('modalNombre').value.trim();
-  if (!nombre) return;
-  const id = 'c_' + Date.now();
-  campaigns[id] = { name: nombre, template: [], opts: {} };
-  saveCampaigns();
-  cerrarModal();
-  activeCampaign = id;
-  renderCampaignSelect();
-  document.getElementById('campaignSelect').value = id;
-  cargarCampana(id);
-}
-
-function borrarCampana() {
-  if (Object.keys(campaigns).length <= 1) {
-    alert('Debe haber al menos una campaña.');
-    return;
-  }
-  if (!confirm('¿Borrar "' + campaigns[activeCampaign].name + '"?')) return;
-  delete campaigns[activeCampaign];
-  saveCampaigns();
-  activeCampaign = Object.keys(campaigns)[0];
-  renderCampaignSelect();
-}
-
-function setStatus(msg) {
-  const el = document.getElementById('campaignStatus');
-  el.textContent = msg;
-  setTimeout(() => el.textContent = '', 2000);
-}
-
-document.getElementById('campaignSelect').onchange = function() {
-  activeCampaign = this.value;
-  cargarCampana(activeCampaign);
-};
-
-document.getElementById('modalNombre').addEventListener('keydown', e => {
-  if (e.key === 'Enter') confirmarNuevaCampana();
-  if (e.key === 'Escape') cerrarModal();
-});
-
-// === INIT ===
-window.addEventListener('DOMContentLoaded', () => {
-  const k = localStorage.getItem('gemini_key');
-  if (k) document.getElementById('apiKey').value = k;
-  loadCampaigns();
-  setSep(3);
-  
-  // Stats input
-  document.getElementById('input').addEventListener('input', function() {
-    const lines = this.value.trim().split('\n').filter(l => l.trim().length > 2);
-    document.getElementById('statsIn').innerHTML = lines.length 
-      ? '<span class="stat">Líneas: <strong>' + lines.length + '</strong></span>'
-      : '';
-  });
-});
-</script>
-</body>
-</html>
